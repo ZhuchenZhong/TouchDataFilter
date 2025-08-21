@@ -6,11 +6,12 @@ from pathlib import Path
 config = configparser.ConfigParser()
 
 # Set current values from your code
-PROJECT_ROOT = Path(__file__).parent.absolute()
+PROJECT_ROOT = Path(__file__).parent
 DATA_ROOT = PROJECT_ROOT / "data"
 MODEL_ROOT = PROJECT_ROOT / "model"
 SENSITIVITY_ROOT = PROJECT_ROOT / "result" / "sensitivity"
 PREDICTED_ROOT = PROJECT_ROOT / "result" / "predicted"
+CONFIG_ROOT = PROJECT_ROOT / "config"
 
 if torch.cuda.is_available():
     gpu_mem = torch.cuda.get_device_properties(0).total_memory / (1024**3)  # GB
@@ -35,5 +36,5 @@ config['GPU'] = {
 }
 
 # Write to file
-with open('settings.ini', 'w') as f:
+with open(CONFIG_ROOT / 'settings.ini', 'w') as f:
     config.write(f)

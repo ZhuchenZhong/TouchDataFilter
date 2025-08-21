@@ -1,391 +1,383 @@
 # TouchDataFilter
 
-一个基于深度学习的触摸数据滤波系统，用于处理触摸屏传感器数据中的噪声，提升数据质量和触摸体验。
+<div align="center">
 
-## 目录
+![Python](https://img.shields.io/badge/Python-3.11+-blue?style=flat-square&logo=python&logoColor=white)![PyTorch](https://img.shields.io/badge/PyTorch-2.6.0+cu124-red?style=flat-square&logo=pytorch&logoColor=white)![License](https://img.shields.io/badge/License-MPL--2.0-green?style=flat-square)![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey?style=flat-square)![Status](https://img.shields.io/badge/Status-Active-brightgreen?style=flat-square)
 
-- [项目概述](#项目概述)
-- [系统架构](#系统架构)
-- [模型原理](#模型原理)
-- [环境要求](#环境要求)
-- [安装说明](#安装说明)
-- [使用方法](#使用方法)
-- [数据格式](#数据格式)
-- [训练说明](#训练说明)
-- [预测与推理](#预测与推理)
-- [模型详细信息](#模型详细信息)
-- [工具说明](#工具说明)
-- [配置文件](#配置文件)
-- [许可证](#许可证)
+**🚀 基于深度学习的触摸数据滤波系统**
 
-## 项目概述
+## 📖 快速开始
 
-TouchDataFilter 是一个专门为触摸屏数据滤波设计的深度学习系统。该系统能够有效去除触摸传感器数据中的噪声，同时保留重要的触摸特征和细节信息。项目提供了两种模型实现：
+### 💻 安装
 
-- **浮点模型 (TouchFilterNet_fp)**: 高精度的浮点数模型，适用于服务器端和高性能设备
-- **整数模型 (TouchFilterNet_int)**: 量化的整数模型，适用于资源受限的嵌入式设备
+```bash
+# 克隆项目
+git clone https://github.com/ZhuchenZhong/TouchDataFilter.git
+cd TouchDataFilter
 
-## 系统架构
+# 创建虚拟环境
+uv venv
 
-系统采用模块化设计，主要包含以下组件：
+# 安装依赖
+pip install torch torchvision numpy matplotlib rich
+
+# 自动配置
+python init.py
+```
+
+### 🚀 使用示例
+
+```python
+from core.TouchFilterNet_fp import TouchFilterNet
+from core.dataProcessor import TouchDataParser
+
+# 加载模型
+model = TouchFilterNet()
+model.load_state_dict(torch.load('models/best_model.pth'))
+
+# 处理数据
+parser = TouchDataParser('data/input.txt')
+header, touch_data = parser.parse()
+
+# 预测滤波
+output = model(input_tensor)
+```
+
+### 🎮 GUI界面
+
+```bash
+python predict.py  # 启动图形化界面
+```
+
+## 🎯 模型架构
+
+### 🏗️ 网络结构
+
+TouchFilterNet采用**编码器-解码器架构**，集成多项创新技术：
+
+```mermaid
+graph TB
+    A[输入触摸数据<br/>1×H×W] --> B[编码器<br/>1→16→32→64]
+    B --> C[注意力机制<br/>64→32→1]
+    B --> D[解码器<br/>64→32→16→1]
+    C --> E[特征加权]
+    D --> E
+    A --> F[残差连接<br/>1×1卷积]
+    E --> G[基础输出]
+    F --> G
+    A --> H[差异增强<br/>2→8→1]
+    G --> H
+    H --> I[最终输出]
+```
+
+### 🧮 核心技术
+
+| 技术组件                | 功能描述       | 创新点           |
+| ----------------------- | -------------- | ---------------- |
+| **编码器-解码器** | 特征提取与重建 | 多层次特征学习   |
+| **注意力机制**    | 聚焦重要区域   | 自适应权重分配   |
+| **残差连接**      | 信息流保护     | 1×1卷积学习映射 |
+| **差异增强**      | 动态特征调整   | 高差异区域增强   |
+
+### 📊 损失函数
+
+**差异保留损失 (DiffPreservingLoss)**:
+
+$$
+L_{total} = \beta \cdot L_{MSE} + (1-\beta) \cdot L_{weighted}
+$$
+
+其中差异权重为: $w = |y|^{\alpha} + 0.5$
+
+- **α = 1.8**: 高差异区域权重系数
+- **β = 0.5**: 损失平衡参数
+
+## 📈 性能表现
+
+### 🎯 精度对比
+
+| 模型类型           | MSE Loss | 推理时间(GPU) | 推理时间(CPU) | 内存占用 |
+| ------------------ | -------- | ------------- | ------------- | -------- |
+| **浮点模型** | < 0.001  | ~10ms         | ~50ms         | 200MB    |
+| **整数模型** | < 0.005  | ~5ms          | ~20ms         | 50MB     |
+
+### 💾 模型规格
+
+| 指标               | 浮点模型          | 整数模型        |
+| ------------------ | ----------------- | --------------- |
+| **参数量**   | ~50K              | ~50K            |
+| **量化位宽** | 32-bit            | 8-bit           |
+| **部署场景** | 服务器/高性能设备 | 嵌入式/移动设备 |
+
+## 🛠️ 开发计划
+
+### ✅ 已完成
+
+- [X] 基础编码器-解码器架构
+- [X] 注意力机制实现
+- [X] 差异保留损失函数
+- [X] 浮点模型训练
+- [X] 整数模型量化
+- [X] GUI预测界面
+- [X] 数据可视化工具
+- [X] 模型评估指标
+- [X] 文档完善
+
+### 🚧 进行中
+
+- [ ] 模型性能优化
+  - [ ] 网络结构调优
+  - [ ] 超参数搜索
+  - [ ] 损失函数改进
+
+## 📂 项目结构
+
+## 📂 项目结构
 
 ```
 TouchDataFilter/
-├── core/                     # 核心模块
-│   ├── dataProcessor.py      # 数据处理器
-│   ├── TouchFilterNet_fp.py  # 浮点模型
-│   └── TouchFilterNet_int.py # 整数模型
-├── data/                     # 数据集
-├── models/                   # 训练好的模型
-├── tools/                    # 辅助工具
-├── docs/                     # 文档
-└── resource/                 # 资源文件
+├── 📁 core/                     # 🧠 核心模块
+│   ├── dataProcessor.py         # 📊 数据处理器
+│   ├── TouchFilterNet_fp.py     # 🔢 浮点模型
+│   └── TouchFilterNet_int.py    # ⚡ 整数模型
+├── 📁 data/                     # 💾 数据集
+│   ├── 1/, 2/, ..., 10/         # 🔢 多指触摸数据
+│   ├── raw/                     # 📄 原始数据
+│   └── test/                    # 🧪 测试数据
+├── 📁 models/                   # 🤖 训练模型
+├── 📁 tools/                    # 🛠️ 辅助工具
+│   ├── viewer.py                # 👁️ 数据查看器
+│   ├── viewer_tk.py             # 🖼️ GUI查看器
+│   └── findTFN_fp_DPL_alpha.py  # 🎯 参数优化
+├── 📁 docs/                     # 📚 文档目录
+├── 📁 resource/                 # 📦 资源文件
+├── train.py                     # 🏋️ 浮点模型训练
+├── train_TouchFilterNet_int.py  # ⚡ 整数模型训练
+├── predict.py                   # 🔮 GUI预测工具
+├── predict-cli.py               # 💻 命令行预测
+└── init.py                      # ⚙️ 环境初始化
 ```
 
-## 模型原理
+## 🎨 数据格式
 
-### 网络架构
-
-TouchFilterNet 采用**编码器-解码器架构**，结合了以下关键技术：
-
-#### 1. 编码器-解码器结构
-
-- **编码器**: 使用多层卷积网络提取触摸数据的层次特征
-- **解码器**: 逐步恢复原始分辨率，重建滤波后的数据
-
-#### 2. 注意力机制
-
-- 自适应地关注高差异区域（重要的触摸特征）
-- 使用Sigmoid激活函数生成注意力权重图
-- 帮助模型专注于需要重点处理的区域
-
-#### 3. 残差连接
-
-- 使用1×1卷积学习残差映射
-- 保证网络的可训练性和梯度流动
-- 防止信息丢失和梯度消失
-
-#### 4. 差异增强机制
-
-- 根据输入数据的差异特性动态调整输出
-- 对高差异区域进行增强处理
-- 对低差异区域保持原有特征
-
-### 损失函数
-
-#### 差异保留损失 (DiffPreservingLoss)
-
-$$
-总损失 = \beta \times MSE损失 + (1 - \beta) \times 加权MSE损失
-$$
-
-- **$\alpha$ 参数**: 控制高差异区域的权重系数 (默认1.8)
-- **$\beta$ 参数**: 平衡MSE损失和差异保留损失 (默认0.5)
-- **差异权重**: $|targets|^{\alpha} + 0.5$ ，为高差异区域分配更大权重
-
-### 量化策略（整数模型）
-
-整数模型采用量化技术将浮点运算转换为整数运算：
-
-- **位宽**: 支持8位量化 (可配置)
-- **量化范围**: $[-2^{7}, 2^{7}-1] = [-128, 127]$ (8位)
-- **激活函数**: 使用查找表或分段线性近似
-- **整数卷积**: 自定义IntConv2d层实现整数域卷积
-
-## 环境要求
-
-### 基本要求
-
-- Python 3.8+
-- PyTorch 1.12+
-- CUDA 11.0+ (GPU训练可选)
-
-### 依赖包
-
-> PyTorch 注意需要选择对应的 cuda / cpu 版本
-
-```bash
-torch>=1.12.0
-torchvision
-numpy
-matplotlib
-rich
-tkinter
-pathlib
-dataclasses
-```
-
-## 安装说明
-
-1. **克隆项目**
-
-```bash
-git clone https://github.com/ZhuchenZhong/TouchDataFilter.git
-cd TouchDataFilter
-```
-
-2. **创建虚拟环境**
-
-```bash
-python -m venv .venv
-source .venv/bin/activate  # Linux/Mac
-# 或
-.venv\Scripts\activate     # Windows
-```
-
-3. **安装依赖**
-
-```bash
-pip install torch torchvision numpy matplotlib rich
-```
-
-4. **配置项目**
-
-```bash
-python init.py  # 自动检测GPU并生成配置
-```
-
-## 使用方法
-
-### 快速开始
-
-1. **训练浮点模型**
-
-```bash
-python train.py
-```
-
-2. **训练整数模型**
-
-```bash
-python train_TouchFilterNet_int.py
-```
-
-3. **运行预测**
-
-```bash
-python predict.py
-```
-
-4. **命令行预测**
-
-```bash
-python predict-cli.py --model_path models/your_model.pth --input_file data/test_data.txt
-```
-
-### GUI预测工具
-
-运行 `predict.py` 将启动图形化界面：
-
-- 选择预训练模型
-- 加载触摸数据文件
-- 实时查看滤波效果
-- 保存处理结果
-
-## 数据格式
-
-### 输入数据格式
-
-触摸数据文件采用特定的文本格式：
+### 📄 输入数据结构
 
 ```
 DATE,2024-01-01
 TIME,12:00:00
 FW Ver: 1.0.0
-TX,32
-RX,18
-TX_VOLTAGE,5000
-Cf,100
+TX,32                    # 发送通道数
+RX,18                    # 接收通道数
+TX_VOLTAGE,5000         # 发送电压
+Cf,100                  # 配置参数
 
-Frame[1]:
-<触摸数据矩阵>
+Frame[1]:               # 帧数据开始
+<32×18触摸数据矩阵>
+Frame[2]:
 ...
 ```
 
-### 数据结构
+### 🏗️ 数据结构类
 
-- **HeaderInfo**: 包含日期、时间、固件版本、TX/RX通道数等元信息
-- **TouchData**: 包含帧号、时间戳、数据矩阵等触摸信息
+| 类名           | 功能       | 主要字段                             |
+| -------------- | ---------- | ------------------------------------ |
+| `HeaderInfo` | 文件头信息 | date, time, fw_version, tx, rx       |
+| `TouchData`  | 触摸帧数据 | frame_number, timestamp, data_matrix |
 
-## 训练说明
+## 🏋️ 训练指南
 
-### 训练参数
+### ⚙️ 训练参数
 
 ```python
+# 🎯 核心参数
 EPOCH = 50                          # 训练轮数
-BATCH_SIZE = 32-128                 # 自动根据GPU内存调整
+BATCH_SIZE = 32-128                 # 自动调整批次大小
 LEARNING_RATE = 1e-3                # 学习率 η = 10^{-3}
-OPTIMIZER = Adam                    # 优化器
-SCHEDULER = ReduceLROnPlateau       # 学习率调度器
+OPTIMIZER = Adam                    # Adam优化器
+SCHEDULER = ReduceLROnPlateau       # 自适应学习率
+
+# 📊 损失函数参数
+ALPHA = 1.8                         # 差异权重系数
+BETA = 0.5                          # 损失平衡参数
 ```
 
-### 训练流程
+### 🔄 训练流程
 
-1. **数据预处理**: 自动解析触摸数据文件，处理噪声和正常数据对
-2. **模型初始化**: 创建网络结构并初始化参数
-3. **训练循环**:
-   - 前向传播计算损失
-   - 反向传播更新参数
-   - 验证集评估性能
-4. **模型保存**: 定期保存检查点和最佳模型
-
-### 混合精度训练
-
-支持自动混合精度(AMP)训练以提高训练效率：
-
-- 自动检测GPU支持
-- 使用GradScaler进行梯度缩放
-- 减少内存使用，提高训练速度
-
-## 预测与推理
-
-### 模型加载
-
-```python
-from core.TouchFilterNet_fp import TouchFilterNet
-from core.TouchFilterNet_int import TouchFilterNet_int
-
-# 加载浮点模型
-model_fp = TouchFilterNet()
-model_fp.load_state_dict(torch.load('model_fp.pth'))
-
-# 加载整数模型
-model_int = TouchFilterNet_int(bits=8)
-model_int.load_state_dict(torch.load('model_int.pth'))
+```mermaid
+graph LR
+    A[数据加载] --> B[模型初始化]
+    B --> C[训练循环]
+    C --> D[验证评估]
+    D --> E[模型保存]
+    E --> F[可视化结果]
 ```
 
-### 数据预处理
-
-```python
-from core.dataProcessor import TouchDataParser
-
-# 解析触摸数据
-parser = TouchDataParser('data_file.txt')
-header, touch_data = parser.parse()
-
-# 转换为模型输入格式
-input_tensor = torch.tensor(touch_data[0].data_matrix).unsqueeze(0).unsqueeze(0)
-```
-
-## 模型详细信息
-
-### 浮点模型 (TouchFilterNet_fp)
-
-#### 网络结构
-
-- **输入**: 单通道触摸数据 $(1 \times H \times W)$
-- **编码器**: 3层卷积 $(1 \rightarrow 16 \rightarrow 32 \rightarrow 64$ 通道$)$
-- **注意力**: $64 \rightarrow 32 \rightarrow 1$ 通道，Sigmoid激活
-- **解码器**: 3层卷积 $(64 \rightarrow 32 \rightarrow 16 \rightarrow 1$ 通道$)$
-- **残差**: $1 \times 1$ 卷积学习残差映射
-- **差异增强**: $2$ 通道输入 $\rightarrow 8 \rightarrow 1$ 通道输出
-
-#### 参数量
-
-- 总参数: $\sim 50K$
-- 可训练参数: $\sim 50K$
-- 内存占用: $\sim 200MB$ (训练时)
-
-### 整数模型 (TouchFilterNet_int)
-
-#### 量化特性
-
-- **量化位宽**: 8位整数
-- **权重量化**: 对称量化，范围 $[-128, 127]$
-- **激活量化**: ReLU使用 $[0, 127]$ 范围
-- **特殊函数**: Sigmoid/Tanh使用查找表近似
-
-#### 优化特性
-
-- **计算效率**: 整数运算替代浮点运算
-- **内存效率**: 8位存储替代32位浮点
-- **硬件友好**: 适合FPGA/ASIC部署
-
-## 工具说明
-
-### 数据可视化工具
-
-1. **viewer.py**: 基于matplotlib的数据查看器
-2. **viewer_tk.py**: 基于tkinter的交互式查看器
-3. **findTFN_fp_DPL_alpha.py**: 差异保留损失参数寻找工具
-
-### 使用示例
+### 🚀 启动训练
 
 ```bash
-# 可视化触摸数据
-python tools/viewer.py --file data/test_data.txt
+# 🔢 浮点模型训练
+python train.py
 
-# 交互式数据查看
-python tools/viewer_tk.py
+# ⚡ 整数模型训练
+python train_TouchFilterNet_int.py
 
-# 参数优化
+# 📊 参数搜索
 python tools/findTFN_fp_DPL_alpha.py --data_dir data/
 ```
 
-## 配置文件
+## 🔮 预测与推理
 
-### settings.ini
+### 🖥️ GUI界面使用
+
+```bash
+python predict.py
+```
+
+**功能特性:**
+
+- 🎯 模型选择器
+- 📁 文件加载器
+- 📊 实时数据可视化
+- 💾 结果保存功能
+
+### 💻 命令行使用
+
+```bash
+python predict-cli.py \
+    --model_path models/best_model.pth \
+    --input_file data/test_data.txt \
+    --output_file results/filtered_data.txt
+```
+
+### 🔧 API使用
+
+```python
+from core.TouchFilterNet_fp import TouchFilterNet
+from core.dataProcessor import TouchDataParser
+
+# 📥 加载模型
+model = TouchFilterNet()
+model.load_state_dict(torch.load('models/best_model.pth'))
+model.eval()
+
+# 📊 处理数据
+parser = TouchDataParser('input.txt')
+header, frames = parser.parse()
+
+# 🔮 执行预测
+with torch.no_grad():
+    input_tensor = torch.tensor(frames[0].data_matrix).unsqueeze(0).unsqueeze(0)
+    output = model(input_tensor)
+```
+
+## 🛠️ 工具箱
+
+### 📊 数据可视化
+
+| 工具                        | 功能             | 使用场景 |
+| --------------------------- | ---------------- | -------- |
+| `viewer.py`               | Matplotlib查看器 | 数据分析 |
+| `viewer_tk.py`            | 交互式GUI        | 实时查看 |
+| `findTFN_fp_DPL_alpha.py` | 参数优化         | 调参实验 |
+
+### 🔧 使用示例
+
+```bash
+# 📈 可视化数据
+python tools/viewer.py --file data/sample.txt
+
+# 🖼️ 交互式查看
+python tools/viewer_tk.py
+
+# 🎯 优化参数  
+python tools/findTFN_fp_DPL_alpha.py --alpha 1.5 --beta 0.6
+```
+
+## ⚙️ 配置文件
+
+### 📝 settings.ini
 
 ```ini
 [PATHS]
 project_root = /path/to/TouchDataFilter
 data_root = /path/to/data
 model_root = /path/to/models
+result_root = /path/to/results
 
 [GPU]
 gpu_support = True
 batch_size = 47
+mixed_precision = True
+
+[TRAINING]
+epochs = 50
+learning_rate = 1e-3
+save_interval = 5
 ```
 
-### 自动配置
+### 🤖 自动配置
 
-运行 `init.py` 将自动：
+```bash
+python init.py  # 🔍 自动检测环境并生成配置
+```
 
-- 检测GPU支持情况
-- 计算最优批次大小
-- 生成配置文件
-- 创建必要目录
+**自动配置功能:**
 
-## 性能指标
+- ✅ GPU支持检测
+- 📊 内存容量分析
+- 🎯 最优批次大小计算
+- 📁 目录结构创建
 
-### 模型性能
+## 🤝 贡献指南
 
-- **浮点模型精度**: $MSE < 0.001$ (验证集)
-- **整数模型精度**: $MSE < 0.005$ (验证集)
-- **推理速度**:
-  - 浮点模型: $\sim 10ms$ (GPU), $\sim 50ms$ (CPU)
-  - 整数模型: $\sim 5ms$ (GPU), $\sim 20ms$ (CPU)
+欢迎参与项目贡献！请遵循以下步骤：
 
-### 资源消耗
+### 🔄 贡献流程
 
-- **浮点模型**: $200MB$ 内存, $50K$ 参数
-- **整数模型**: $50MB$ 内存, $50K$ 参数 (8位量化)
+1. **🍴 Fork项目** → 2. **🌿 创建分支** → 3. **💻 开发功能** → 4. **🧪 测试验证** → 5. **📤 提交PR**
 
-## 贡献指南
+```bash
+# 1. Fork并克隆
+git clone https://github.com/your-username/TouchDataFilter.git
 
-欢迎提交Issue和Pull Request来改进项目：
+# 2. 创建特性分支
+git checkout -b feature/amazing-feature
 
-1. Fork项目仓库
-2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 创建Pull Request
+# 3. 提交更改
+git commit -m "✨ Add amazing feature"
 
-## 许可证
+# 4. 推送分支
+git push origin feature/amazing-feature
 
-本项目采用 Mozilla Public License 2.0 许可证。详见 [LICENSE](LICENSE) 文件。
+# 5. 创建Pull Request
+```
 
-## 更新日志
+### 📋 贡献指导
 
-### v1.0.0 (2025-07-15)
+- 🐛 **Bug报告**: 使用Issue模板描述问题
+- 💡 **功能建议**: 详细说明需求和用例
+- 📝 **代码贡献**: 遵循代码风格规范
+- 📚 **文档改进**: 完善README和注释
 
-- 初始版本发布
-- 实现浮点和整数两种模型
-- 添加GUI预测工具
-- 完善文档和示例
+## 📄 许可证
+
+本项目采用 [Mozilla Public License 2.0](LICENSE) 许可证。
+
+## 📞 联系方式
+
+<div align="center">
+
+**👨‍💻 项目维护者**: [ZhuchenZhong](https://github.com/ZhuchenZhong)
+
+[![GitHub](https://img.shields.io/badge/GitHub-ZhuchenZhong-blue?style=flat-square&logo=github)](https://github.com/ZhuchenZhong)
+[![Project](https://img.shields.io/badge/Project-TouchDataFilter-green?style=flat-square&logo=github)](https://github.com/ZhuchenZhong/TouchDataFilter)
+
+**🌟 如果这个项目对你有帮助，请给一个Star！**
+
+</div>
 
 ---
 
-**项目维护者**: ZhuchenZhong
-**联系方式**: [GitHub](https://github.com/ZhuchenZhong)
-**项目地址**: https://github.com/ZhuchenZhong/TouchDataFilter
+<div align="center">
+  <sub>Built with ❤️ by <a href="https://github.com/ZhuchenZhong">ZhuchenZhong</a></sub>
+</div>
