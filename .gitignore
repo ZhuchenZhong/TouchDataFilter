@@ -2,6 +2,7 @@
 data/
 models/
 results/
+resource/private/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

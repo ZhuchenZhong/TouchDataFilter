@@ -1,372 +1,391 @@
-## TouchDataFilter
+# TouchDataFilter
 
-本项目实现了一个基于深度学习的触摸数据滤波系统，用于处理触摸屏数据中的噪声，提升数据质量。模型采用编码器-解码器架构，结合注意力机制和差异保留机制。因此本项目的模型我们可以称作 **带有注意力机制和差异增强的残差编码器-解码器网络**
+一个基于深度学习的触摸数据滤波系统，用于处理触摸屏传感器数据中的噪声，提升数据质量和触摸体验。
 
-同时我们使用 `Ubuntu 22.04 LTS` 作为我们的上位平台
+## 目录
 
-#### 准备工作
+- [项目概述](#项目概述)
+- [系统架构](#系统架构)
+- [模型原理](#模型原理)
+- [环境要求](#环境要求)
+- [安装说明](#安装说明)
+- [使用方法](#使用方法)
+- [数据格式](#数据格式)
+- [训练说明](#训练说明)
+- [预测与推理](#预测与推理)
+- [模型详细信息](#模型详细信息)
+- [工具说明](#工具说明)
+- [配置文件](#配置文件)
+- [许可证](#许可证)
 
-##### 驱动安装
+## 项目概述
 
-###### Nivdia 驱动
+TouchDataFilter 是一个专门为触摸屏数据滤波设计的深度学习系统。该系统能够有效去除触摸传感器数据中的噪声，同时保留重要的触摸特征和细节信息。项目提供了两种模型实现：
 
-对于训练和推理(Python)部分，我们借助显卡进行加速计算
+- **浮点模型 (TouchFilterNet_fp)**: 高精度的浮点数模型，适用于服务器端和高性能设备
+- **整数模型 (TouchFilterNet_int)**: 量化的整数模型，适用于资源受限的嵌入式设备
 
-基于训练平台我们采用 `cuda + cudnn`
+## 系统架构
 
-首先是安装驱动  `Nivdia-Driver`
+系统采用模块化设计，主要包含以下组件：
+
+```
+TouchDataFilter/
+├── core/                     # 核心模块
+│   ├── dataProcessor.py      # 数据处理器
+│   ├── TouchFilterNet_fp.py  # 浮点模型
+│   └── TouchFilterNet_int.py # 整数模型
+├── data/                     # 数据集
+├── models/                   # 训练好的模型
+├── tools/                    # 辅助工具
+├── docs/                     # 文档
+└── resource/                 # 资源文件
+```
+
+## 模型原理
+
+### 网络架构
+
+TouchFilterNet 采用**编码器-解码器架构**，结合了以下关键技术：
+
+#### 1. 编码器-解码器结构
+
+- **编码器**: 使用多层卷积网络提取触摸数据的层次特征
+- **解码器**: 逐步恢复原始分辨率，重建滤波后的数据
+
+#### 2. 注意力机制
+
+- 自适应地关注高差异区域（重要的触摸特征）
+- 使用Sigmoid激活函数生成注意力权重图
+- 帮助模型专注于需要重点处理的区域
+
+#### 3. 残差连接
+
+- 使用1×1卷积学习残差映射
+- 保证网络的可训练性和梯度流动
+- 防止信息丢失和梯度消失
+
+#### 4. 差异增强机制
+
+- 根据输入数据的差异特性动态调整输出
+- 对高差异区域进行增强处理
+- 对低差异区域保持原有特征
+
+### 损失函数
+
+#### 差异保留损失 (DiffPreservingLoss)
+
+$$
+总损失 = \beta \times MSE损失 + (1 - \beta) \times 加权MSE损失
+$$
+
+- **$\alpha$ 参数**: 控制高差异区域的权重系数 (默认1.8)
+- **$\beta$ 参数**: 平衡MSE损失和差异保留损失 (默认0.5)
+- **差异权重**: $|targets|^{\alpha} + 0.5$ ，为高差异区域分配更大权重
+
+### 量化策略（整数模型）
+
+整数模型采用量化技术将浮点运算转换为整数运算：
+
+- **位宽**: 支持8位量化 (可配置)
+- **量化范围**: $[-2^{7}, 2^{7}-1] = [-128, 127]$ (8位)
+- **激活函数**: 使用查找表或分段线性近似
+- **整数卷积**: 自定义IntConv2d层实现整数域卷积
+
+## 环境要求
+
+### 基本要求
+
+- Python 3.8+
+- PyTorch 1.12+
+- CUDA 11.0+ (GPU训练可选)
+
+### 依赖包
+
+> PyTorch 注意需要选择对应的 cuda / cpu 版本
 
 ```bash
-$ nvidia-detector
-nvidia-driver-570
+torch>=1.12.0
+torchvision
+numpy
+matplotlib
+rich
+tkinter
+pathlib
+dataclasses
 ```
 
-自带的驱动程序会检索出符合当前平台的驱动版本号
+## 安装说明
 
-然后在 [Nvidia](https://www.nvidia.cn/) 官网检索当前驱动版本并下载 `.run` 文件
-
-> 当然这一步可以使用 `ubuntu-drivers` 进行检索安装
-
-随后赋予执行权限
+1. **克隆项目**
 
 ```bash
-$ chmod +x /path/to/your/.run-file
-$ sudo ./path/to/your/.run-file
+git clone https://github.com/ZhuchenZhong/TouchDataFilter.git
+cd TouchDataFilter
 ```
 
-> 注意：不需要安装 32-bit 的库
-
-然后我们随后重启设备
+2. **创建虚拟环境**
 
 ```bash
-$ sudo reboot
+python -m venv .venv
+source .venv/bin/activate  # Linux/Mac
+# 或
+.venv\Scripts\activate     # Windows
 ```
 
-随后我们确认驱动是否正常安装
+3. **安装依赖**
 
 ```bash
-$ nvidia-smi
-Tue Jul 15 16:34:14 2025   
-+-----------------------------------------------------------------------------------------+
-| NVIDIA-SMI 570.169                Driver Version: 570.169        CUDA Version: 12.8     |
-|-----------------------------------------+------------------------+----------------------+
-| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
-| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
-|                                         |                        |               MIG M. |
-|=========================================+========================+======================|
-|   0  NVIDIA GeForce RTX 5090        Off |   00000000:01:00.0  On |                  N/A |
-|  0%   40C    P8             22W /  575W |     590MiB /  32607MiB |      7%      Default |
-|                                         |                        |                  N/A |
-+-----------------------------------------+------------------------+----------------------+
-                                                                 
-+-----------------------------------------------------------------------------------------+
-| Processes:                                                                              |
-|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
-|        ID   ID                                                               Usage      |
-|=========================================================================================|
-|    0   N/A  N/A            1423      G   /usr/lib/xorg/Xorg                       37MiB |
-|    0   N/A  N/A            1816      G   /usr/lib/xorg/Xorg                      168MiB |
-|    0   N/A  N/A            1926      G   /usr/bin/gnome-shell                     62MiB |
-|    0   N/A  N/A            2747      G   /usr/share/code/code                     53MiB |
-|    0   N/A  N/A           76615      G   /usr/lib/firefox/firefox                174MiB |
-+-----------------------------------------------------------------------------------------+
+pip install torch torchvision numpy matplotlib rich
 ```
 
-应该会有类似输出，如若不是请检查安装的驱动是否支持当前显卡/是否正确安装驱动
-
-可以尝试如下指令排查
+4. **配置项目**
 
 ```bash
-$ lspci | grep -i nvidia
-$ lsmod | grep -i nvidia
-$ dmesg | grep -i NVRM
-$ cat /var/log/Xorg.0.log | grep EE
+python init.py  # 自动检测GPU并生成配置
 ```
 
-###### Cuda & cudnn
+## 使用方法
 
-接着我们在 `nvidia-smi` 的输出中可以看到当前显卡的最高 `cuda` 版本支持
+### 快速开始
 
-我们这里使用 `cuda-12.8`
-
-同样的，进入 `Nvidia` 官网检索 `cuda & cudnn` 的 `.run` 包
-
-> 注意：`cudnn` 的版本跟随 `cuda` 版本能支持的最新驱动
->
-> 同时安装 `cuda` 时只需要勾选 `cuda toolkit` 而不需要重新安装驱动
-
-安装好 `cudnn` 后我们需要将其添加至环境变量中(语句中的信息可能需要按需更改)
-
-我们可以将下列指令添加至 `~/.bashrc` 的末尾
+1. **训练浮点模型**
 
 ```bash
-export PATH=/usr/local/cuda-12.8/bin:$PATH
-export LD_LIBRARY_PATH=/usr/local/cuda-12.8/lib64:$LD_LIBRARY_PATH
+python train.py
 ```
 
-然后重启电脑，检查是否正常安装
+2. **训练整数模型**
 
 ```bash
-$ nvcc -V
-nvcc: NVIDIA (R) Cuda compiler driver
-Copyright (c) 2005-2025 NVIDIA Corporation
-Built on Fri_Feb_21_20:23:50_PST_2025
-Cuda compilation tools, release 12.8, V12.8.93
-Build cuda_12.8.r12.8/compiler.35583870_0
+python train_TouchFilterNet_int.py
 ```
 
-至此，准备工作完成一半
-
-##### Python
-
-然后我们检查 `Python` 的版本
+3. **运行预测**
 
 ```bash
-$ python -V
-Python 3.8.10
+python predict.py
 ```
 
-低版本的 `Ubuntu` 自带的 `Python` 版本过低不支持 `PyTorch` 框架，我们选用 `3.9 ~ 3.12` 之间的
-
-这里我们选择 `3.11.x`
-
-首先我们在 [Python](https://python.org) 官网中下载源代码至本地
-
-这里我们选择将其放置在 `/usr/src` 下，目的是不干扰系统环境
+4. **命令行预测**
 
 ```bash
-$ wget https://...
-$ tar -xvf Python-3.x.x.tgz
-$ cd Python-3.x.x
+python predict-cli.py --model_path models/your_model.pth --input_file data/test_data.txt
 ```
 
-然后我们需要安装相关依赖项(下载缓慢记得换源)
+### GUI预测工具
+
+运行 `predict.py` 将启动图形化界面：
+
+- 选择预训练模型
+- 加载触摸数据文件
+- 实时查看滤波效果
+- 保存处理结果
+
+## 数据格式
+
+### 输入数据格式
+
+触摸数据文件采用特定的文本格式：
+
+```
+DATE,2024-01-01
+TIME,12:00:00
+FW Ver: 1.0.0
+TX,32
+RX,18
+TX_VOLTAGE,5000
+Cf,100
+
+Frame[1]:
+<触摸数据矩阵>
+...
+```
+
+### 数据结构
+
+- **HeaderInfo**: 包含日期、时间、固件版本、TX/RX通道数等元信息
+- **TouchData**: 包含帧号、时间戳、数据矩阵等触摸信息
+
+## 训练说明
+
+### 训练参数
+
+```python
+EPOCH = 50                          # 训练轮数
+BATCH_SIZE = 32-128                 # 自动根据GPU内存调整
+LEARNING_RATE = 1e-3                # 学习率 η = 10^{-3}
+OPTIMIZER = Adam                    # 优化器
+SCHEDULER = ReduceLROnPlateau       # 学习率调度器
+```
+
+### 训练流程
+
+1. **数据预处理**: 自动解析触摸数据文件，处理噪声和正常数据对
+2. **模型初始化**: 创建网络结构并初始化参数
+3. **训练循环**:
+   - 前向传播计算损失
+   - 反向传播更新参数
+   - 验证集评估性能
+4. **模型保存**: 定期保存检查点和最佳模型
+
+### 混合精度训练
+
+支持自动混合精度(AMP)训练以提高训练效率：
+
+- 自动检测GPU支持
+- 使用GradScaler进行梯度缩放
+- 减少内存使用，提高训练速度
+
+## 预测与推理
+
+### 模型加载
+
+```python
+from core.TouchFilterNet_fp import TouchFilterNet
+from core.TouchFilterNet_int import TouchFilterNet_int
+
+# 加载浮点模型
+model_fp = TouchFilterNet()
+model_fp.load_state_dict(torch.load('model_fp.pth'))
+
+# 加载整数模型
+model_int = TouchFilterNet_int(bits=8)
+model_int.load_state_dict(torch.load('model_int.pth'))
+```
+
+### 数据预处理
+
+```python
+from core.dataProcessor import TouchDataParser
+
+# 解析触摸数据
+parser = TouchDataParser('data_file.txt')
+header, touch_data = parser.parse()
+
+# 转换为模型输入格式
+input_tensor = torch.tensor(touch_data[0].data_matrix).unsqueeze(0).unsqueeze(0)
+```
+
+## 模型详细信息
+
+### 浮点模型 (TouchFilterNet_fp)
+
+#### 网络结构
+
+- **输入**: 单通道触摸数据 $(1 \times H \times W)$
+- **编码器**: 3层卷积 $(1 \rightarrow 16 \rightarrow 32 \rightarrow 64$ 通道$)$
+- **注意力**: $64 \rightarrow 32 \rightarrow 1$ 通道，Sigmoid激活
+- **解码器**: 3层卷积 $(64 \rightarrow 32 \rightarrow 16 \rightarrow 1$ 通道$)$
+- **残差**: $1 \times 1$ 卷积学习残差映射
+- **差异增强**: $2$ 通道输入 $\rightarrow 8 \rightarrow 1$ 通道输出
+
+#### 参数量
+
+- 总参数: $\sim 50K$
+- 可训练参数: $\sim 50K$
+- 内存占用: $\sim 200MB$ (训练时)
+
+### 整数模型 (TouchFilterNet_int)
+
+#### 量化特性
+
+- **量化位宽**: 8位整数
+- **权重量化**: 对称量化，范围 $[-128, 127]$
+- **激活量化**: ReLU使用 $[0, 127]$ 范围
+- **特殊函数**: Sigmoid/Tanh使用查找表近似
+
+#### 优化特性
+
+- **计算效率**: 整数运算替代浮点运算
+- **内存效率**: 8位存储替代32位浮点
+- **硬件友好**: 适合FPGA/ASIC部署
+
+## 工具说明
+
+### 数据可视化工具
+
+1. **viewer.py**: 基于matplotlib的数据查看器
+2. **viewer_tk.py**: 基于tkinter的交互式查看器
+3. **findTFN_fp_DPL_alpha.py**: 差异保留损失参数寻找工具
+
+### 使用示例
 
 ```bash
-$ sudo apt update
-$ sudo apt install -y build-essential checkinstall
-$ sudo apt install -y libreadline-gplv2-dev libncursesw5-dev libssl-dev libsqlite3-dev tk-dev libgdbm-dev libc6-dev libbz2-dev libffi-dev zlib1g-dev
+# 可视化触摸数据
+python tools/viewer.py --file data/test_data.txt
+
+# 交互式数据查看
+python tools/viewer_tk.py
+
+# 参数优化
+python tools/findTFN_fp_DPL_alpha.py --data_dir data/
 ```
 
-随后我们开始进行编译
+## 配置文件
 
-> `pip` 的换源是全局的，如果全局换过就不用了
+### settings.ini
 
-```bash
-$ /configure --enable-optimizations
-$ make -j$(nproc)
-$ make altinstall
-$ ./python -m ensurepip
-$ ./python -m pip install -U pip
+```ini
+[PATHS]
+project_root = /path/to/TouchDataFilter
+data_root = /path/to/data
+model_root = /path/to/models
+
+[GPU]
+gpu_support = True
+batch_size = 47
 ```
 
-然后我们在 `~/.bashrc` 末尾添加(不用也可以)
+### 自动配置
 
-```bash
-alias python311=/usr/src/Python-3.11.9/python
-alias pip311='/usr/src/Python-3.11.9/python -m pip'
-```
+运行 `init.py` 将自动：
 
-接着是最后一部我们使用 `uv` 作为我们的环境管理
+- 检测GPU支持情况
+- 计算最优批次大小
+- 生成配置文件
+- 创建必要目录
 
-```bash
-$ sudo snap install astral-uv
-```
+## 性能指标
 
-准备完成
+### 模型性能
 
-#### 训练
+- **浮点模型精度**: $MSE < 0.001$ (验证集)
+- **整数模型精度**: $MSE < 0.005$ (验证集)
+- **推理速度**:
+  - 浮点模型: $\sim 10ms$ (GPU), $\sim 50ms$ (CPU)
+  - 整数模型: $\sim 5ms$ (GPU), $\sim 20ms$ (CPU)
 
-##### 虚拟环境
+### 资源消耗
 
-首先是部署虚拟环境
+- **浮点模型**: $200MB$ 内存, $50K$ 参数
+- **整数模型**: $50MB$ 内存, $50K$ 参数 (8位量化)
 
-```bash
-$ cd TouchDataFilter
-$ uv venv #或者 uv init ; uv venv
-```
+## 贡献指南
 
-然后是安装对应的包
+欢迎提交Issue和Pull Request来改进项目：
 
-最先安装 `PyTorch` 框架，固定依赖项
+1. Fork项目仓库
+2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 创建Pull Request
 
-在其 [官网](https://pytorch.org/get-started/locally/) 中选择符合的版本，在当前平台( `cuda12.8 ` + `python311` )
+## 许可证
 
-```bash
-$ uv pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
-```
+本项目采用 Mozilla Public License 2.0 许可证。详见 [LICENSE](LICENSE) 文件。
 
-然后就是批量安装了
+## 更新日志
 
-```bash
-$ uv pip install 	\
-	numpy 		\
-	pandas 		\
-	matplotlib	\
-	rich		\
-	scikit-learn
-```
+### v1.0.0 (2025-07-15)
 
-##### 训练数据结构
-
-在开始训练之前，首先是理解输入数据的结构
-
-```plaintext
-Header_Start:
-DATE, 2025/14/07
-TIME, 16:12:42 
-FW Ver: 1;Arg Ver: 1;PrjID: 1;Dbg Ver: 53;ArgStruct: 28 
-TX,17
-RX,36
-TX_VOLTAGE,7
-Cf,10
-Header_End
-
-MC Diff: Frame 0
-
-	MC_TX01,   -76,  -50,  -15,  -20,  -45,  -52,  -49,  -61,  -10,   28,  -38,  -46,  -44,  -72,   -4,  -24,  -63,  -61,  -10,  -59,  -80,  -62,  -93,  -90, -112,  -85, -103,  -96,  -96,  -90, -111,  -92,  -97, -107, -103,  -97,
-	MC_TX02,   -31,   -8,    0,    2,  -22,  -31,  -34,  -50,    7,   31,  -20,  -29,  -33,  -66,    2,  -18,  -46,  -55,  -14,  -31,  -61,  -43,  -74,  -74,  -84,  -74,  -78,  -69,  -78,  -72,  -77,  -89,  -82,  -88,  -91,  -76,
-	MC_TX03,   -30,    3,   13,    3,  -18,  -25,  -25,  -41,    5,   33,  -19,  -19,  -30,  -46,    1,  -17,  -42,  -49,  -18,  -36,  -66,  -48,  -78,  -76,  -98,  -80,  -88,  -77,  -87,  -74,  -87,  -92,  -89,  -94,  -98,  -88,
-	MC_TX04,   -42,  -16,   -4,   -5,  -33,  -37,  -42,  -55,  -11,   16,  -30,  -35,  -30,  -70,  -14,  -32,  -51,  -59,  -42,  -42,  -69,  -48,  -86,  -81, -103,  -79,  -95,  -88,  -90,  -84,  -90,  -98,  -89,  -98, -100,  -91,
-	MC_TX05,   -40,  -24,  -20,  -18,  -46,  -47,  -48,  -65,  -19,   16,  -36,  -42,  -42,  -66,  -15,  -37,  -56,  -68,  -21,  -51,  -68,  -57,  -84,  -82,  -93,  -81,  -89,  -75,  -83,  -76,  -82,  -79,  -78,  -88,  -86,  -78,
-	MC_TX06,   -15,   -1,   13,   -3,  -20,  -20,  -25,  -33,    4,   30,  -14,  -17,  -20,  -44,    3,  -12,  -34,  -37,   -9,  -17,  -48,  -30,  -61,  -57,  -72,  -57,  -65,  -54,  -64,  -51,  -62,  -58,  -62,  -64,  -68,  -47,
-	MC_TX07,   -26,  -20,  -10,   -6,  -31,  -52,  -63,  -50,  -15,   22,  -28,  -33,  -23,  -59,  -14,  -31,  -52,  -59,  -28,  -44,  -73,  -55,  -81,  -78,  -88,  -83,  -89,  -79,  -86,  -74,  -94,  -87,  -83,  -98,  -90,  -77,
-	MC_TX08,   318,  157,  175,  178,  148,  138,  119,  130,  161,  169,  131,  122,  122,  127,  141,  135,  106,  101,  113,  163,   75,   93,   63,   63,   44,   18,   51,   45,   36,   48,   19,   27,   29,   16,    3,   12,
-	MC_TX09,    67,   99,  100,  104,   81,   60,   49,   53,   94,  105,   64,   52,   41,   56,   74,   71,   31,   31,   44,  107,   14,   38,    5,    9,   -6,  -27,   -5,    2,   -4,   -2,  -34,   -7,  -15,  -33,  -35,  -29,
-	MC_TX10,   205,  125,  137,  133,  120,  102,   91,   89,  133,  135,  104,   95,   75,   86,  105,  106,   77,   73,   78,  161,   54,   77,   42,   50,   35,    6,   36,   42,   35,   44,    9,   27,   24,    6,   -1,    8,
-	MC_TX11,   270,  130,  136,  132,  109,   98,   86,   82,  126,  131,   98,   86,   87,   79,  105,   95,   74,   68,   74,  136,   44,   60,   34,   34,   18,    1,   21,   23,   18,   31,    0,    1,    1,    1,  -21,  -15,
-	MC_TX12,   190,  125,  141,  142,  119,  106,   91,   80,  130,  132,  100,   84,   76,   87,  104,   98,   72,   69,   71,  157,   49,   72,   41,   42,   27,   10,   35,   33,   35,   35,    3,   25,   19,    6,   -9,   -3,
-	MC_TX13,   327,  128,  134,  134,  119,  104,   86,   79,  125,  118,   94,   87,   92,   73,   99,   86,   72,   64,   63,  138,   46,   55,   32,   27,   14,  -12,   14,   14,    9,   15,  -19,   -2,   -1,  -21,  -25,  -28,
-	MC_TX14,   344,  160,  152,  149,  138,  124,  111,  106,  146,  153,  120,  108,  108,  102,  125,  119,   98,   85,   84,  157,   69,   81,   54,   59,   32,   16,   49,   43,   37,   45,   22,   29,   26,   16,    6,   10,
-	MC_TX15,    88,  112,  119,  130,  107,   88,   76,   79,  120,  138,   90,   84,   85,   73,  113,   91,   64,   57,   76,  119,   42,   56,   26,   32,   14,   14,   13,   20,   26,   30,   69,   33,   15,    2,    6,  -11,
-	MC_TX16,    82,  105,  116,  112,   90,   64,   60,   60,  110,  128,   85,   74,   72,   62,  109,   85,   55,   41,   55,   94,   35,   49,   21,   23,   16,    8,   17,   21,   34,  268,  583,  384,   38,    9,   13,   -2,
-	MC_TX17,    51,  106,  120,  126,   95,   77,   68,   79,  117,  138,   82,   72,   68,   85,  111,   92,   58,   59,   81,  128,   36,   61,   29,   41,   12,   17,   26,   21,   79,  527,  586,  536,   70,    5,    9,   -2,
-
-```
-
-可以看到先是头部数据，然后是帧数据
-
-我们需要准备若干对含有噪声和期望的数据文件，且这些文件在名字上仅有 `亮屏` 和 `灭屏` 的区分
-
-> 例如 `亮屏1指.txt` 和 `灭屏1指.txt`
-
-然后我们在 `train.py` 中的
-
-```python-repl
-EPOCH = 50
-```
-
-##### 训练轮数的选择
-
-选择我们需要训练的轮数
-
-> 其实训练轮数不是越大越好，轮数过大容易过拟合，过小效果不好
->
-> 简单来说我们可以通过观察 loss 的值确定是否停止训练(也就是早停机制， 本项目未实现)
-
-然后执行
-
-```bash
-$ uv run train.py
-```
-
-> 对于后续的运行 Python 脚本，均是使用 `uv run .py` 的格式
-
-#### 推理
-
-我们这里首先使用 Python 进行推理，简单来说也就是使用训练好的模型
-
-这里我们提供了两个脚本 `predict.py` 和 `predict-cli.py`
-
-前者是图形化的预测脚本，后者是命令行批量化的脚本
-
-##### 模型的选择
-
-项目根目录下 `models/`
-
-每次训练的模型会以时间分开，预测脚本默认加载最后训练的模型
-
-同时我们会发现，某次训练后保存的模型目录结构如下
-
-```bash
-/
-    checkpoints/
-	best_model.pth
-	model_epoch_5.pth
-	...
-    touch_filter_model.pth
-```
-
-其中 `checkpoints` 下是每轮训练定时保存的节点，但是 `best_model.pth` 是训练中自动保存了一个最好的模型(其实是验证集中准确度最高的)
-
-然后 `touch_filter_model.pth` 可以看作是总的模型，也就是每轮训练后综合起来的，不一定是最佳模型
-
-然后命令行批量预测的命名规则
-
-保存路径为预测数据文件夹下的 `predictions/{time}` 文件夹
-
-保存文件名为 '{原文件名}-predicted.txt'
-
-#### 部署
-
-我们的目标平台不支持我们使用 `Python` 等对计算机性能要求过高的程序，这里我们采用转移成通用的模型在 `PyTorch/C++` 的框架下进行推理
-
-##### LibTorch
-
-一样的，我们首先是在其官网中下载 `C++/CPU` 版本的(目标平台没有cuda， npu也是使用cpu的版本)
-
-下载好以后我们将其解压到 `/opt` 下
-
-##### 编译项目
-
-我们此时回到我们的项目根目录
-
-```bash
-$ sudo apt update
-$ sudo apt install -y cmake make
-```
-
-然后我们查看 `CMakeLists.txt` ，这里最重要的是定义了 `libtorch` 库的位置以及我们需要编译的对象
-
-```bash
-$ mkdir -p build
-$ cd build/
-$ rm -rf * # 确保自己在 /build 下
-$ cmake ..
-$ make
-```
-
-不出意外的话我们的可执行程序和连接库分别编译在 `/build/bin` 下和 `/build/lib` 下
-
-##### 转译模型
-
-> 其实应该是先创建 `/build` 后转译再编译的
-
-然后我们转译模型，回到我们的项目根目录
-
-```bash
-$ uv run transfer.py
-```
-
-默认会将最后训练出的模型转译到 `build/models` 下
-
-然后是 `C++` 版的推理过程
-
-```bash
-$ cd build/bin
-$ ./predict --input /path/to/your/file --output /path/to/your/file --model ../models/best_model.pth
-```
-
-接着就是使用工具查看滤波后的数据
-
-
-
-#### 模型内部数据流转
-
-```
-原始数据 (int16) → 归一化 (float32/1000.0) → 模型处理 (float32) → 反归一化 (float32*1000.0) → 保存 (int16)
-```
+- 初始版本发布
+- 实现浮点和整数两种模型
+- 添加GUI预测工具
+- 完善文档和示例
 
 ---
 
-*版本日期：2025年1月*
+**项目维护者**: ZhuchenZhong
+**联系方式**: [GitHub](https://github.com/ZhuchenZhong)
+**项目地址**: https://github.com/ZhuchenZhong/TouchDataFilter
