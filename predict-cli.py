@@ -29,7 +29,7 @@ from rich.logging import RichHandler
 from core.dataProcessor import TouchDataParser, TouchData
 from core.TouchFilterNet_fp import TouchFilterNet
 from train import CHECKPOINT_PATH   # 导入模型路径常量
-from tools.findTFN_fp_DPL_alpha import BATCH_SIZE
+from findTFN_fp_DPL_alpha import BATCH_SIZE
 
 logging.basicConfig(
     level="NOTSET",
