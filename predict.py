@@ -79,7 +79,7 @@ class TouchDataPredictor:
             console.print(f"[bold red]加载模型失败: {str(e)}[/bold red]")
             
             # 如果常规加载失败且不是整数模型尝试，尝试以整数模型格式加载
-            if not is_int_model:
+            if not is_int_model: # type: ignore
                 console.print("尝试使用整形格式加载。")
                 try:
                     from core.TouchFilterNet_int import TouchFilterNet_int
@@ -314,7 +314,7 @@ class TouchDataPredictor:
         if frame_idx < len(self.input_frames) and self.input_frames[frame_idx].data_matrix is not None:
             # 绘制原始数据
             self.ax1.imshow(
-                self.input_frames[frame_idx].data_matrix,
+                self.input_frames[frame_idx].data_matrix, # type: ignore
                 cmap='viridis',
                 interpolation='none',
                 vmin=0,
